@@ -1,8 +1,12 @@
-import { Category } from "@/types/database";
 import { cn } from "@/lib/utils";
 
+interface CategoryItem {
+  id: string;
+  name: string;
+}
+
 interface CategoryFilterProps {
-  categories: Category[];
+  categories: CategoryItem[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
 }

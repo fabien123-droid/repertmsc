@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, Check, FileText, Music2, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, Download, Check, FileText, Music2, ZoomIn, ZoomOut, WifiOff } from "lucide-react";
 import { useSong } from "@/hooks/useSongs";
 import { useOfflineStorage, getBlob } from "@/hooks/useOfflineStorage";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,8 +63,20 @@ export default function SongPage() {
     return (
       <div className="min-h-screen bg-background">
         <Header />
-        <main className="container py-6">
-          <p className="text-center text-muted-foreground">Chant non trouvé</p>
+        <main className="container py-6 text-center">
+          <WifiOff className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+          <p className="text-muted-foreground mb-2">Chant non disponible</p>
+          {!isOnline && (
+            <p className="text-sm text-muted-foreground">
+              Ce chant n'a pas été téléchargé pour l'accès hors-ligne
+            </p>
+          )}
+          <button 
+            onClick={() => navigate("/")} 
+            className="mt-4 text-primary hover:underline"
+          >
+            Retour à l'accueil
+          </button>
         </main>
       </div>
     );
