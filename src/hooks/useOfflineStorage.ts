@@ -3,17 +3,31 @@ import { Song, CachedSong } from "@/types/database";
 import { supabase } from "@/integrations/supabase/client";
 
 const CACHE_KEY = "chorale_cached_songs";
+const DB_NAME = "chorale_blobs";
+const STORE_NAME = "files";
 
 export function useOfflineStorage() {
   const [cachedSongs, setCachedSongs] = useState<CachedSong[]>([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     // Load cached songs from localStorage
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (cached) {
-      setCachedSongs(JSON.parse(cached));
-    }
+    const loadCachedSongs = async () => {
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const songs = JSON.parse(cached) as CachedSong[];
+          setCachedSongs(songs);
+        }
+      } catch (error) {
+        console.error("Error loading cached songs:", error);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+
+    loadCachedSongs();
 
     // Listen for online/offline events
     const handleOnline = () => setIsOnline(true);
@@ -43,10 +57,18 @@ export function useOfflineStorage() {
         }
       }
 
+      // Create cached song with all necessary data
       const cachedSong: CachedSong = {
-        ...song,
+        id: song.id,
+        title: song.title,
+        author: song.author,
+        lyrics: song.lyrics,
+        file_path: song.file_path,
+        category_id: song.category_id,
+        created_at: song.created_at,
+        updated_at: song.updated_at,
+        categories: song.categories,
         cachedAt: Date.now(),
-        fileBlob,
       };
 
       const newCachedSongs = [
@@ -54,9 +76,8 @@ export function useOfflineStorage() {
         cachedSong,
       ];
 
-      // Store in localStorage (without blob for size reasons)
-      const toStore = newCachedSongs.map(({ fileBlob, ...rest }) => rest);
-      localStorage.setItem(CACHE_KEY, JSON.stringify(toStore));
+      // Store metadata in localStorage
+      localStorage.setItem(CACHE_KEY, JSON.stringify(newCachedSongs));
       
       // Store blob separately in IndexedDB
       if (fileBlob) {
@@ -86,20 +107,23 @@ export function useOfflineStorage() {
     return cachedSongs.find((s) => s.id === songId);
   }, [cachedSongs]);
 
+  const getAllCachedSongs = useCallback(() => {
+    return cachedSongs;
+  }, [cachedSongs]);
+
   return {
     cachedSongs,
     cacheSong,
     removeCachedSong,
     isSongCached,
     getCachedSong,
+    getAllCachedSongs,
     isOnline,
+    isLoaded,
   };
 }
 
 // IndexedDB helpers for blob storage
-const DB_NAME = "chorale_blobs";
-const STORE_NAME = "files";
-
 async function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
