@@ -1,12 +1,10 @@
-import { Link, useLocation } from "react-router-dom";
-import { Music, Settings, Download, Wifi, WifiOff } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Music, Download, Wifi, WifiOff } from "lucide-react";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { cn } from "@/lib/utils";
 
 export function Header() {
-  const location = useLocation();
   const { isOnline, cachedSongs } = useOfflineStorage();
-  const isAdmin = location.pathname.startsWith("/admin");
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -38,20 +36,6 @@ export function Header() {
               <span>{cachedSongs.length}</span>
             </div>
           )}
-
-          {/* Admin link */}
-          <Link
-            to={isAdmin ? "/" : "/admin"}
-            className={cn(
-              "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-              isAdmin 
-                ? "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            )}
-          >
-            <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">{isAdmin ? "Accueil" : "Admin"}</span>
-          </Link>
         </div>
       </div>
     </header>
