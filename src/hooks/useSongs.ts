@@ -2,6 +2,27 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Song } from "@/types/database";
 import { toast } from "sonner";
+import { z } from "zod";
+
+// Schema for validating search queries
+const searchSchema = z.string()
+  .max(100, 'Requête de recherche trop longue')
+  .regex(/^[a-zA-Z0-9\s\-'àâäéèêëïîôùûüÿçÀÂÄÉÈÊËÏÎÔÙÛÜŸÇœŒæÆ]*$/, 'Caractères non autorisés');
+
+// Sanitize search query for safe use in ILIKE patterns
+function sanitizeSearchQuery(query: string): string | null {
+  const trimmed = query.trim();
+  if (!trimmed) return null;
+  
+  const result = searchSchema.safeParse(trimmed);
+  if (!result.success) {
+    console.warn('Invalid search query:', result.error.message);
+    return null;
+  }
+  
+  // Escape special ILIKE characters
+  return result.data.replace(/[%_\\]/g, '\\$&');
+}
 
 export function useSongs(categoryId?: string | null, searchQuery?: string) {
   return useQuery({
@@ -20,7 +41,10 @@ export function useSongs(categoryId?: string | null, searchQuery?: string) {
       }
       
       if (searchQuery) {
-        query = query.or(`title.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%`);
+        const sanitized = sanitizeSearchQuery(searchQuery);
+        if (sanitized) {
+          query = query.or(`title.ilike.%${sanitized}%,author.ilike.%${sanitized}%`);
+        }
       }
       
       const { data, error } = await query;

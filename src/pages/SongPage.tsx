@@ -130,7 +130,12 @@ export default function SongPage() {
             <div className="bg-card rounded-2xl border border-border overflow-hidden">
               {fileUrl ? (
                 displaySong.file_path?.endsWith(".pdf") ? (
-                  <iframe src={fileUrl} className="w-full h-[70vh]" title="Partition" />
+                  <iframe 
+                    src={fileUrl} 
+                    className="w-full h-[70vh]" 
+                    title="Partition"
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                  />
                 ) : (
                   <img src={fileUrl} alt="Partition" className="w-full h-auto max-h-[70vh] object-contain" />
                 )

@@ -1,10 +1,27 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Define allowed origins for CORS
+const allowedOrigins = [
+  "https://lovable.dev",
+  "https://www.lovable.dev",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const isAllowed = origin && (
+    allowedOrigins.includes(origin) || 
+    origin.endsWith(".lovable.app") ||
+    origin.endsWith(".lovable.dev")
+  );
+  
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin : allowedOrigins[0],
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
 
 interface AdminSignupRequest {
   email: string;
@@ -12,6 +29,9 @@ interface AdminSignupRequest {
 }
 
 serve(async (req: Request): Promise<Response> => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -36,10 +56,34 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return new Response(
+        JSON.stringify({ error: "Format d'email invalide" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (password.length < 6) {
       return new Response(
         JSON.stringify({ error: "Le mot de passe doit contenir au moins 6 caractères" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Limit total number of admins
+    const { count } = await supabase
+      .from("user_roles")
+      .select("*", { count: "exact", head: true });
+
+    const adminCount = count || 0;
+    
+    if (adminCount >= 10) {
+      console.warn("Admin limit reached, rejecting signup attempt");
+      return new Response(
+        JSON.stringify({ error: "Nombre maximum d'administrateurs atteint" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -71,12 +115,6 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Count existing admins
-    const { count } = await supabase
-      .from("user_roles")
-      .select("*", { count: "exact", head: true });
-
-    const adminCount = count || 0;
     const role = adminCount < 2 ? "super_admin" : "admin";
 
     // Assign admin role
@@ -96,6 +134,8 @@ serve(async (req: Request): Promise<Response> => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log(`Admin created: ${email} with role: ${role}`);
 
     return new Response(
       JSON.stringify({ 
