@@ -22,6 +22,16 @@ export default function SongPage() {
   const cachedSong = getCachedSong(id!);
   const displaySong = isOnline ? song : cachedSong;
 
+  // Track song view on mount
+  useEffect(() => {
+    const trackView = async () => {
+      if (id) {
+        try { await supabase.rpc('increment_stat', { stat_name: 'songs_viewed' }); } catch {}
+      }
+    };
+    trackView();
+  }, [id]);
+
   useEffect(() => {
     async function loadFile() {
       if (!displaySong?.file_path) return;
@@ -41,8 +51,13 @@ export default function SongPage() {
   const handleCacheSong = async () => {
     if (!song) return;
     const success = await cacheSong(song);
-    if (success) toast.success("Chant téléchargé pour l'accès hors ligne");
-    else toast.error("Erreur lors du téléchargement");
+    if (success) {
+      // Track download
+      try { await supabase.rpc('increment_stat', { stat_name: 'downloads' }); } catch {}
+      toast.success("Chant téléchargé pour l'accès hors ligne");
+    } else {
+      toast.error("Erreur lors du téléchargement");
+    }
   };
 
   if (isLoading && !cachedSong) {
