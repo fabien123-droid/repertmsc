@@ -1,7 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useSongs } from "@/hooks/useSongs";
 import { useCategories } from "@/hooks/useCategories";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
+import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { SearchBar } from "@/components/SearchBar";
 import { CategoryFilter } from "@/components/CategoryFilter";
@@ -11,6 +12,13 @@ import { Music, WifiOff, Download } from "lucide-react";
 import { Song } from "@/types/database";
 
 const Index = () => {
+  // Track page view on mount
+  useEffect(() => {
+    const trackView = async () => {
+      try { await supabase.rpc('increment_stat', { stat_name: 'page_views' }); } catch {}
+    };
+    trackView();
+  }, []);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
