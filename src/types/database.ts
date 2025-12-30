@@ -11,6 +11,7 @@ export interface Song {
   lyrics: string | null;
   category_id: string | null;
   file_path: string | null;
+  audio_path: string | null;
   created_at: string;
   updated_at: string;
   categories?: Category | null;
@@ -19,4 +20,5 @@ export interface Song {
 export interface CachedSong extends Song {
   cachedAt: number;
   fileBlob?: Blob;
+  audioBlob?: Blob;
 }

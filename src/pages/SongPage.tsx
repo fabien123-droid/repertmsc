@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Download, Check, FileText, Music2, ZoomIn, ZoomOut, WifiOff, Headphones } from "lucide-react";
 import { useSong } from "@/hooks/useSongs";
-import { useOfflineStorage, getBlob } from "@/hooks/useOfflineStorage";
+import { useOfflineStorage, getBlob, getAudioBlob } from "@/hooks/useOfflineStorage";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -49,11 +49,20 @@ export default function SongPage() {
     loadFile();
   }, [displaySong, isOnline]);
 
-  // Load audio file
+  // Load audio file - supports offline cached audio
   useEffect(() => {
     async function loadAudio() {
-      const audioPath = (displaySong as any)?.audio_path;
+      const audioPath = displaySong?.audio_path;
       if (!audioPath) { setAudioUrl(null); return; }
+      
+      // Try to load from cache first
+      const cachedAudioBlob = await getAudioBlob(displaySong.id);
+      if (cachedAudioBlob) {
+        setAudioUrl(URL.createObjectURL(cachedAudioBlob));
+        return;
+      }
+      
+      // Fall back to online if available
       if (isOnline) {
         const { data } = await supabase.storage.from("audio-files").getPublicUrl(audioPath);
         setAudioUrl(data.publicUrl);
