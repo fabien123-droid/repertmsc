@@ -64,6 +64,7 @@ export type Database = {
       }
       songs: {
         Row: {
+          audio_path: string | null
           author: string | null
           category_id: string | null
           created_at: string
@@ -74,6 +75,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          audio_path?: string | null
           author?: string | null
           category_id?: string | null
           created_at?: string
@@ -84,6 +86,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          audio_path?: string | null
           author?: string | null
           category_id?: string | null
           created_at?: string
