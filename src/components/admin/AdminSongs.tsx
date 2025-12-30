@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Edit, Trash2, Upload, Loader2 } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, FileAudio } from "lucide-react";
 import { Song } from "@/types/database";
 import { toast } from "sonner";
 
@@ -26,15 +26,16 @@ export function AdminSongs() {
   const updateSong = useUpdateSong();
   const deleteSong = useDeleteSong();
 
-  const [form, setForm] = useState({ title: "", author: "", lyrics: "", category_id: "", file_path: "" });
+  const [form, setForm] = useState({ title: "", author: "", lyrics: "", category_id: "", file_path: "", audio_path: "" });
+  const [uploadingAudio, setUploadingAudio] = useState(false);
 
   const handleOpen = (song?: Song) => {
     if (song) {
       setEditingSong(song);
-      setForm({ title: song.title, author: song.author || "", lyrics: song.lyrics || "", category_id: song.category_id || "", file_path: song.file_path || "" });
+      setForm({ title: song.title, author: song.author || "", lyrics: song.lyrics || "", category_id: song.category_id || "", file_path: song.file_path || "", audio_path: (song as any).audio_path || "" });
     } else {
       setEditingSong(null);
-      setForm({ title: "", author: "", lyrics: "", category_id: "", file_path: "" });
+      setForm({ title: "", author: "", lyrics: "", category_id: "", file_path: "", audio_path: "" });
     }
     setIsOpen(true);
   };
@@ -52,10 +53,23 @@ export function AdminSongs() {
     setUploading(false);
   };
 
+  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAudio(true);
+    const ext = file.name.split(".").pop();
+    const path = `${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage.from("audio-files").upload(path, file);
+    if (error) { toast.error("Erreur upload audio"); setUploadingAudio(false); return; }
+    setForm((f) => ({ ...f, audio_path: path }));
+    toast.success("Audio uploadé");
+    setUploadingAudio(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) { toast.error("Titre requis"); return; }
-    const data = { title: form.title.trim(), author: form.author.trim() || undefined, lyrics: form.lyrics.trim() || undefined, category_id: form.category_id || undefined, file_path: form.file_path || undefined };
+    const data = { title: form.title.trim(), author: form.author.trim() || undefined, lyrics: form.lyrics.trim() || undefined, category_id: form.category_id || undefined, file_path: form.file_path || undefined, audio_path: form.audio_path || undefined };
     if (editingSong) await updateSong.mutateAsync({ id: editingSong.id, ...data });
     else await createSong.mutateAsync(data);
     setIsOpen(false);
@@ -85,6 +99,13 @@ export function AdminSongs() {
                   {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
                 </div>
                 {form.file_path && <p className="text-xs text-muted-foreground mt-1">Fichier: {form.file_path}</p>}
+              </div>
+              <div><Label className="flex items-center gap-2"><FileAudio className="h-4 w-4" />Audio (MP3/WAV)</Label>
+                <div className="flex gap-2 items-center">
+                  <Input type="file" accept=".mp3,.wav,.m4a,.ogg" onChange={handleAudioUpload} disabled={uploadingAudio} />
+                  {uploadingAudio && <Loader2 className="h-4 w-4 animate-spin" />}
+                </div>
+                {form.audio_path && <p className="text-xs text-muted-foreground mt-1">Audio: {form.audio_path}</p>}
               </div>
               <Button type="submit" className="w-full" disabled={createSong.isPending || updateSong.isPending}>
                 {(createSong.isPending || updateSong.isPending) ? <Loader2 className="h-4 w-4 animate-spin" /> : editingSong ? "Mettre à jour" : "Ajouter"}

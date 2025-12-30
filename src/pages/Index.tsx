@@ -4,6 +4,7 @@ import { useCategories } from "@/hooks/useCategories";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { SearchBar } from "@/components/SearchBar";
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { SongCard } from "@/components/SongCard";
@@ -153,6 +154,9 @@ const Index = () => {
           )}
         </div>
       </main>
+      
+      {/* PWA Install Prompt */}
+      <InstallPrompt />
     </div>
   );
 };

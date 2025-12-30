@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, Check, FileText, Music2, ZoomIn, ZoomOut, WifiOff } from "lucide-react";
+import { ArrowLeft, Download, Check, FileText, Music2, ZoomIn, ZoomOut, WifiOff, Headphones } from "lucide-react";
 import { useSong } from "@/hooks/useSongs";
 import { useOfflineStorage, getBlob } from "@/hooks/useOfflineStorage";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,7 @@ export default function SongPage() {
   const { isSongCached, cacheSong, getCachedSong, isOnline } = useOfflineStorage();
   const [fontSize, setFontSize] = useState(18);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   
   const isCached = isSongCached(id!);
   const cachedSong = getCachedSong(id!);
@@ -46,6 +47,19 @@ export default function SongPage() {
       }
     }
     loadFile();
+  }, [displaySong, isOnline]);
+
+  // Load audio file
+  useEffect(() => {
+    async function loadAudio() {
+      const audioPath = (displaySong as any)?.audio_path;
+      if (!audioPath) { setAudioUrl(null); return; }
+      if (isOnline) {
+        const { data } = await supabase.storage.from("audio-files").getPublicUrl(audioPath);
+        setAudioUrl(data.publicUrl);
+      }
+    }
+    loadAudio();
   }, [displaySong, isOnline]);
 
   const handleCacheSong = async () => {
@@ -120,6 +134,22 @@ export default function SongPage() {
             {isCached ? <><Check className="h-4 w-4 mr-2" />Téléchargé</> : <><Download className="h-4 w-4 mr-2" />Télécharger</>}
           </Button>
         </div>
+
+        {/* Audio Player */}
+        {audioUrl && (
+          <div className="mb-6 bg-card rounded-2xl border border-border p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Headphones className="h-5 w-5 text-primary" />
+              </div>
+              <span className="font-medium">Écouter l'audio</span>
+            </div>
+            <audio controls className="w-full" preload="metadata">
+              <source src={audioUrl} type="audio/mpeg" />
+              Votre navigateur ne supporte pas la lecture audio.
+            </audio>
+          </div>
+        )}
 
         <Tabs defaultValue="lyrics" className="w-full">
           <TabsList className="w-full max-w-md mx-auto grid grid-cols-2 mb-6">
