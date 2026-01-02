@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
-import { Music, Download, Check, User } from "lucide-react";
+import { Music, Download, Check, User, Heart, Headphones } from "lucide-react";
 import { Song } from "@/types/database";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
+import { useFavorites } from "@/hooks/useFavorites";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -12,7 +13,9 @@ interface SongCardProps {
 
 export function SongCard({ song }: SongCardProps) {
   const { isSongCached, cacheSong, removeCachedSong, isOnline } = useOfflineStorage();
+  const { isFavorite, toggleFavorite } = useFavorites();
   const isCached = isSongCached(song.id);
+  const favorite = isFavorite(song.id);
 
   const handleCacheToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -29,6 +32,13 @@ export function SongCard({ song }: SongCardProps) {
         toast.error("Erreur lors du téléchargement");
       }
     }
+  };
+
+  const handleFavoriteToggle = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFavorite(song.id);
+    toast.success(favorite ? "Retiré des favoris" : "Ajouté aux favoris");
   };
 
   return (
@@ -56,25 +66,46 @@ export function SongCard({ song }: SongCardProps) {
               <span className="truncate">{song.author}</span>
             </div>
           )}
-          {song.categories && (
-            <span className="inline-block mt-2 px-2 py-0.5 rounded-full bg-secondary text-xs text-secondary-foreground">
-              {song.categories.name}
-            </span>
-          )}
+          <div className="flex items-center gap-2 mt-2">
+            {song.categories && (
+              <span className="inline-block px-2 py-0.5 rounded-full bg-secondary text-xs text-secondary-foreground">
+                {song.categories.name}
+              </span>
+            )}
+            {song.audio_path && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-xs text-primary">
+                <Headphones className="h-3 w-3" />
+                Audio
+              </span>
+            )}
+          </div>
         </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleCacheToggle}
-          disabled={!isOnline && !isCached}
-          className={cn(
-            "shrink-0 h-10 w-10 rounded-full",
-            isCached ? "text-primary bg-primary/10" : "text-muted-foreground"
-          )}
-        >
-          {isCached ? <Check className="h-5 w-5" /> : <Download className="h-5 w-5" />}
-        </Button>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleFavoriteToggle}
+            className={cn(
+              "h-9 w-9 rounded-full",
+              favorite ? "text-red-500 bg-red-500/10" : "text-muted-foreground"
+            )}
+          >
+            <Heart className={cn("h-4 w-4", favorite && "fill-current")} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleCacheToggle}
+            disabled={!isOnline && !isCached}
+            className={cn(
+              "h-9 w-9 rounded-full",
+              isCached ? "text-primary bg-primary/10" : "text-muted-foreground"
+            )}
+          >
+            {isCached ? <Check className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
     </Link>
   );

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useSongs } from "@/hooks/useSongs";
 import { useCategories } from "@/hooks/useCategories";
 import { useOfflineStorage } from "@/hooks/useOfflineStorage";
+import { useFavorites } from "@/hooks/useFavorites";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { InstallPrompt } from "@/components/InstallPrompt";
@@ -9,8 +10,10 @@ import { SearchBar } from "@/components/SearchBar";
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { SongCard } from "@/components/SongCard";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Music, WifiOff, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Music, WifiOff, Download, Heart } from "lucide-react";
 import { Song } from "@/types/database";
+import { cn } from "@/lib/utils";
 
 const Index = () => {
   // Track page view on mount
@@ -20,38 +23,50 @@ const Index = () => {
     };
     trackView();
   }, []);
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   
   const { data: categories = [], isLoading: categoriesLoading } = useCategories();
   const { data: onlineSongs = [], isLoading: songsLoading } = useSongs(selectedCategory, searchQuery);
   const { cachedSongs, isOnline, isLoaded } = useOfflineStorage();
+  const { favorites } = useFavorites();
 
   // When offline, show cached songs; when online, show online songs
   const displaySongs = useMemo(() => {
+    let songs: Song[];
+    
     if (isOnline) {
-      return onlineSongs;
+      songs = onlineSongs;
+    } else {
+      // Filter cached songs based on search and category
+      let filtered = cachedSongs as Song[];
+      
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        filtered = filtered.filter(
+          (song) =>
+            song.title.toLowerCase().includes(query) ||
+            song.author?.toLowerCase().includes(query) ||
+            song.lyrics?.toLowerCase().includes(query)
+        );
+      }
+      
+      if (selectedCategory) {
+        filtered = filtered.filter((song) => song.category_id === selectedCategory);
+      }
+      
+      songs = filtered;
     }
     
-    // Filter cached songs based on search and category
-    let filtered = cachedSongs as Song[];
-    
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (song) =>
-          song.title.toLowerCase().includes(query) ||
-          song.author?.toLowerCase().includes(query) ||
-          song.lyrics?.toLowerCase().includes(query)
-      );
+    // Filter by favorites if enabled
+    if (showFavoritesOnly) {
+      songs = songs.filter((song) => favorites.includes(song.id));
     }
     
-    if (selectedCategory) {
-      filtered = filtered.filter((song) => song.category_id === selectedCategory);
-    }
-    
-    return filtered;
-  }, [isOnline, onlineSongs, cachedSongs, searchQuery, selectedCategory]);
+    return songs;
+  }, [isOnline, onlineSongs, cachedSongs, searchQuery, selectedCategory, showFavoritesOnly, favorites]);
 
   // Get unique categories from cached songs when offline
   const displayCategories = useMemo(() => {
@@ -110,8 +125,22 @@ const Index = () => {
           </p>
         </div>
 
-        {/* Search */}
-        <SearchBar value={searchQuery} onChange={setSearchQuery} className="max-w-xl mx-auto" />
+        {/* Search and Favorites Toggle */}
+        <div className="flex flex-col sm:flex-row gap-3 items-center max-w-xl mx-auto">
+          <SearchBar value={searchQuery} onChange={setSearchQuery} className="flex-1 w-full" />
+          <Button
+            variant={showFavoritesOnly ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+            className={cn(
+              "gap-2 shrink-0",
+              showFavoritesOnly && "bg-red-500 hover:bg-red-600"
+            )}
+          >
+            <Heart className={cn("h-4 w-4", showFavoritesOnly && "fill-current")} />
+            Favoris ({favorites.length})
+          </Button>
+        </div>
 
         {/* Category filters */}
         {isLoading ? (
@@ -134,7 +163,15 @@ const Index = () => {
             ))
           ) : displaySongs.length === 0 ? (
             <div className="text-center py-12">
-              {!isOnline && cachedSongs.length === 0 ? (
+              {showFavoritesOnly && favorites.length === 0 ? (
+                <>
+                  <Heart className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                  <p className="text-muted-foreground mb-2">Aucun favori</p>
+                  <p className="text-sm text-muted-foreground">
+                    Cliquez sur le cœur d'un chant pour l'ajouter à vos favoris
+                  </p>
+                </>
+              ) : !isOnline && cachedSongs.length === 0 ? (
                 <>
                   <Download className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
                   <p className="text-muted-foreground mb-2">Aucun chant téléchargé</p>
