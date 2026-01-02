@@ -1,20 +1,23 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, Check, FileText, Music2, ZoomIn, ZoomOut, WifiOff, Headphones } from "lucide-react";
+import { ArrowLeft, Download, Check, FileText, Music2, ZoomIn, ZoomOut, WifiOff, Headphones, Share2, Heart } from "lucide-react";
 import { useSong } from "@/hooks/useSongs";
 import { useOfflineStorage, getBlob, getAudioBlob } from "@/hooks/useOfflineStorage";
+import { useFavorites } from "@/hooks/useFavorites";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export default function SongPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: song, isLoading } = useSong(id!);
   const { isSongCached, cacheSong, getCachedSong, isOnline } = useOfflineStorage();
+  const { isFavorite, toggleFavorite } = useFavorites();
   const [fontSize, setFontSize] = useState(18);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -22,6 +25,7 @@ export default function SongPage() {
   const isCached = isSongCached(id!);
   const cachedSong = getCachedSong(id!);
   const displaySong = isOnline ? song : cachedSong;
+  const favorite = isFavorite(id!);
 
   // Track song view on mount
   useEffect(() => {
@@ -83,6 +87,37 @@ export default function SongPage() {
     }
   };
 
+  const handleShare = async () => {
+    const shareUrl = window.location.href;
+    const shareData = {
+      title: displaySong?.title || "Chant",
+      text: displaySong?.author 
+        ? `${displaySong.title} - ${displaySong.author}` 
+        : displaySong?.title || "Découvrez ce chant",
+      url: shareUrl,
+    };
+
+    try {
+      if (navigator.share && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+        toast.success("Partage réussi");
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Lien copié dans le presse-papier");
+      }
+    } catch (error) {
+      if ((error as Error).name !== "AbortError") {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Lien copié dans le presse-papier");
+      }
+    }
+  };
+
+  const handleFavoriteToggle = () => {
+    toggleFavorite(id!);
+    toast.success(favorite ? "Retiré des favoris" : "Ajouté aux favoris");
+  };
+
   if (isLoading && !cachedSong) {
     return (
       <div className="min-h-screen bg-background">
@@ -139,9 +174,30 @@ export default function SongPage() {
               </span>
             )}
           </div>
-          <Button onClick={handleCacheSong} disabled={!isOnline || isCached} variant={isCached ? "secondary" : "default"} className="shrink-0">
-            {isCached ? <><Check className="h-4 w-4 mr-2" />Téléchargé</> : <><Download className="h-4 w-4 mr-2" />Télécharger</>}
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleFavoriteToggle}
+              className={cn(
+                "h-10 w-10 rounded-full",
+                favorite ? "text-red-500 bg-red-500/10" : "text-muted-foreground"
+              )}
+            >
+              <Heart className={cn("h-5 w-5", favorite && "fill-current")} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleShare}
+              className="h-10 w-10 rounded-full text-muted-foreground"
+            >
+              <Share2 className="h-5 w-5" />
+            </Button>
+            <Button onClick={handleCacheSong} disabled={!isOnline || isCached} variant={isCached ? "secondary" : "default"}>
+              {isCached ? <><Check className="h-4 w-4 mr-2" />Téléchargé</> : <><Download className="h-4 w-4 mr-2" />Télécharger</>}
+            </Button>
+          </div>
         </div>
 
         {/* Audio Player */}

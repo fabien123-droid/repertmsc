@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useSongs, useCreateSong, useUpdateSong, useDeleteSong } from "@/hooks/useSongs";
 import { useCategories } from "@/hooks/useCategories";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,15 +10,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Edit, Trash2, Loader2, FileAudio } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, FileAudio, ArrowUpDown, Filter } from "lucide-react";
 import { Song } from "@/types/database";
 import { toast } from "sonner";
+
+type SortOption = "title" | "author" | "date" | "category";
 
 export function AdminSongs() {
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [editingSong, setEditingSong] = useState<Song | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>("title");
+  const [filterCategory, setFilterCategory] = useState<string>("all");
 
   const { data: songs = [], isLoading } = useSongs(null, search);
   const { data: categories = [] } = useCategories();
@@ -28,6 +32,22 @@ export function AdminSongs() {
 
   const [form, setForm] = useState({ title: "", author: "", lyrics: "", category_id: "", file_path: "", audio_path: "" });
   const [uploadingAudio, setUploadingAudio] = useState(false);
+
+  // Filtered and sorted songs
+  const displaySongs = useMemo(() => {
+    let filtered = songs;
+    if (filterCategory && filterCategory !== "all") {
+      filtered = filtered.filter((s) => s.category_id === filterCategory);
+    }
+    return [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case "author": return (a.author || "").localeCompare(b.author || "");
+        case "date": return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case "category": return (a.categories?.name || "").localeCompare(b.categories?.name || "");
+        default: return a.title.localeCompare(b.title);
+      }
+    });
+  }, [songs, sortBy, filterCategory]);
 
   const handleOpen = (song?: Song) => {
     if (song) {
@@ -77,46 +97,75 @@ export function AdminSongs() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <SearchBar value={search} onChange={setSearch} placeholder="Rechercher..." className="w-full sm:max-w-xs" />
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild><Button onClick={() => handleOpen()}><Plus className="h-4 w-4 mr-2" />Ajouter</Button></DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>{editingSong ? "Modifier" : "Ajouter"} un chant</DialogTitle></DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div><Label>Titre *</Label><Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} /></div>
-              <div><Label>Auteur</Label><Input value={form.author} onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))} /></div>
-              <div><Label>Catégorie</Label>
-                <Select value={form.category_id} onValueChange={(v) => setForm((f) => ({ ...f, category_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
-                  <SelectContent>{categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div><Label>Paroles</Label><Textarea value={form.lyrics} onChange={(e) => setForm((f) => ({ ...f, lyrics: e.target.value }))} rows={6} /></div>
-              <div><Label>Partition (PDF/Image)</Label>
-                <div className="flex gap-2 items-center">
-                  <Input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={handleFileUpload} disabled={uploading} />
-                  {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <SearchBar value={search} onChange={setSearch} placeholder="Rechercher..." className="w-full sm:max-w-xs" />
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild><Button onClick={() => handleOpen()}><Plus className="h-4 w-4 mr-2" />Ajouter</Button></DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>{editingSong ? "Modifier" : "Ajouter"} un chant</DialogTitle></DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div><Label>Titre *</Label><Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} /></div>
+                <div><Label>Auteur</Label><Input value={form.author} onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))} /></div>
+                <div><Label>Catégorie</Label>
+                  <Select value={form.category_id} onValueChange={(v) => setForm((f) => ({ ...f, category_id: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                    <SelectContent>{categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                  </Select>
                 </div>
-                {form.file_path && <p className="text-xs text-muted-foreground mt-1">Fichier: {form.file_path}</p>}
-              </div>
-              <div><Label className="flex items-center gap-2"><FileAudio className="h-4 w-4" />Audio (MP3/WAV)</Label>
-                <div className="flex gap-2 items-center">
-                  <Input type="file" accept=".mp3,.wav,.m4a,.ogg" onChange={handleAudioUpload} disabled={uploadingAudio} />
-                  {uploadingAudio && <Loader2 className="h-4 w-4 animate-spin" />}
+                <div><Label>Paroles</Label><Textarea value={form.lyrics} onChange={(e) => setForm((f) => ({ ...f, lyrics: e.target.value }))} rows={6} /></div>
+                <div><Label>Partition (PDF/Image)</Label>
+                  <div className="flex gap-2 items-center">
+                    <Input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={handleFileUpload} disabled={uploading} />
+                    {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
+                  </div>
+                  {form.file_path && <p className="text-xs text-muted-foreground mt-1">Fichier: {form.file_path}</p>}
                 </div>
-                {form.audio_path && <p className="text-xs text-muted-foreground mt-1">Audio: {form.audio_path}</p>}
-              </div>
-              <Button type="submit" className="w-full" disabled={createSong.isPending || updateSong.isPending}>
-                {(createSong.isPending || updateSong.isPending) ? <Loader2 className="h-4 w-4 animate-spin" /> : editingSong ? "Mettre à jour" : "Ajouter"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div><Label className="flex items-center gap-2"><FileAudio className="h-4 w-4" />Audio (MP3/WAV)</Label>
+                  <div className="flex gap-2 items-center">
+                    <Input type="file" accept=".mp3,.wav,.m4a,.ogg" onChange={handleAudioUpload} disabled={uploadingAudio} />
+                    {uploadingAudio && <Loader2 className="h-4 w-4 animate-spin" />}
+                  </div>
+                  {form.audio_path && <p className="text-xs text-muted-foreground mt-1">Audio: {form.audio_path}</p>}
+                </div>
+                <Button type="submit" className="w-full" disabled={createSong.isPending || updateSong.isPending}>
+                  {(createSong.isPending || updateSong.isPending) ? <Loader2 className="h-4 w-4 animate-spin" /> : editingSong ? "Mettre à jour" : "Ajouter"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+        
+        {/* Filters and Sort */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+            <Select value={sortBy} onValueChange={(v: SortOption) => setSortBy(v)}>
+              <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="title">Titre</SelectItem>
+                <SelectItem value="author">Auteur</SelectItem>
+                <SelectItem value="date">Date ajout</SelectItem>
+                <SelectItem value="category">Catégorie</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes catégories</SelectItem>
+                {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <span className="text-sm text-muted-foreground ml-auto">{displaySongs.length} chant{displaySongs.length > 1 ? 's' : ''}</span>
+        </div>
       </div>
 
       <div className="space-y-2">
-        {isLoading ? <p className="text-muted-foreground">Chargement...</p> : songs.length === 0 ? <p className="text-muted-foreground">Aucun chant</p> : songs.map((song) => (
+        {isLoading ? <p className="text-muted-foreground">Chargement...</p> : displaySongs.length === 0 ? <p className="text-muted-foreground">Aucun chant</p> : displaySongs.map((song) => (
           <div key={song.id} className="flex items-center justify-between p-4 rounded-xl border border-border bg-card">
             <div>
               <p className="font-medium">{song.title}</p>
